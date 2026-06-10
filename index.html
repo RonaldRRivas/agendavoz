@@ -225,7 +225,7 @@ main{padding:16px 14px 170px;max-width:680px;margin:0 auto;}
     <h2>Conectar Gemini AI</h2>
     <p>Necesitas una API key gratuita de Google Gemini (1500 requests/dia, sin tarjeta de credito).</p>
     <label>API Key de Gemini</label>
-    <input id="key-input" type="password" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
+    <input id="key-input" type="password" placeholder="Pega aqui tu API key de Gemini..." autocomplete="off" spellcheck="false">
     <div class="modal-btns">
       <button class="btn-primary" onclick="saveKey()">Guardar y usar</button>
       <button class="btn-secondary" onclick="closeConfig()">Cancelar</button>
@@ -686,8 +686,8 @@ function closeConfig() {
 }
 function saveKey() {
   const v = document.getElementById('key-input').value.trim();
-  if (!v || !v.startsWith('AIza')) {
-    toast('La key de Gemini debe empezar con "AIza"','err');
+  if (!v || v.length < 10) {
+    toast('Ingresa una API key valida','err');
     return;
   }
   localStorage.setItem(KEY_STORE, v);
