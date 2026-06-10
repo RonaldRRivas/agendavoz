@@ -244,7 +244,8 @@ main{padding:16px 14px 170px;max-width:680px;margin:0 auto;}
 // ==========================================================
 // CONFIG
 // ==========================================================
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const GEMINI_MODELS = ['gemini-1.5-flash','gemini-1.5-flash-8b','gemini-1.0-pro'];
 const KEY_STORE  = 'voz_gemini_key';
 const REM_STORE  = 'voz_reminders_v3';
 const HOG_STORE  = 'voz_hogar_v3';
@@ -562,30 +563,43 @@ Reglas de categoria: salud=medico/pastilla/cita medica, trabajo=reunion/informe/
 
 Texto a analizar: "${transcript}"`;
 
+  // Intentar con cada modelo hasta que uno funcione
+  let data = null;
+  let lastErr = '';
   try {
-    const resp = await fetch(GEMINI_URL + '?key=' + apiKey, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contents: [{parts: [{text: prompt}]}],
-        generationConfig: {temperature: 0.1, maxOutputTokens: 512}
-      })
-    });
+    for (const model of GEMINI_MODELS) {
+      const url = GEMINI_BASE + model + ':generateContent?key=' + apiKey;
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents: [{parts: [{text: prompt}]}],
+          generationConfig: {temperature: 0.1, maxOutputTokens: 512}
+        })
+      });
 
-    if (!resp.ok) {
-      const e = await resp.json().catch(()=>({}));
-      const msg = e.error?.message || 'Error HTTP ' + resp.status;
-      // API key invalida
-      if (resp.status === 400 || resp.status === 401 || resp.status === 403) {
+      if (resp.status === 401 || resp.status === 403) {
         aiOff(tab); setFab('idle');
-        toast('API key invalida. Verifica tu key de Gemini.', 'err', 5000);
+        toast('API key invalida o sin permisos. Verifica en aistudio.google.com', 'err', 6000);
         openConfig();
         return;
       }
-      throw new Error(msg);
+
+      if (!resp.ok) {
+        const e = await resp.json().catch(()=>({}));
+        lastErr = e.error?.message || 'Error HTTP ' + resp.status;
+        // Si es quota exceeded, intentar siguiente modelo
+        if (resp.status === 429 || (lastErr && lastErr.includes('quota'))) continue;
+        // Otro error no recuperable
+        throw new Error(lastErr);
+      }
+
+      data = await resp.json();
+      break; // exito
     }
 
-    const data = await resp.json();
+    if (!data) throw new Error('Todos los modelos de Gemini alcanzaron su cuota. Intenta en unos minutos.');
+
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const clean = raw.replace(/```json|```/g,'').trim();
 
